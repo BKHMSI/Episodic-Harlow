@@ -1,0 +1,51 @@
+run-title: HE_1
+seed: 1234
+device: cuda
+save-path: ckpt
+log-path: logs
+load-path: ckpt
+save-interval: 500
+resume: false
+dnd: true
+start-episode: 0 
+optimizer: rmsprop # {rmsprop, adam}
+
+task:
+  max-length: 250
+  num-trials: 6
+  num-actions: 2
+  num-objects: 500
+  num-episodes: 3000
+  
+  state-len: 17
+  obs-len: 8
+  obj-offset: 3
+  
+  fix-reward: 0.2
+  obj-reward: 1.0
+
+  map-action:
+    -  1
+    - -1
+
+agent:
+  mem-units: 256
+
+  dict-len: 10_000
+  dict-key-dim: 9
+  dict-kernel: cosine
+
+  n-workers: 4
+  share-optim: true
+  
+  value-loss-weight: 0.4
+  entropy-weight: 0.001
+  max-grad-norm: 0.
+  
+  gae-lambda: 1.
+  gamma: .91
+  lr: 7.5e-4
+  weight-decay: 0
+
+  n-step-update: 20 
+
