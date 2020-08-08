@@ -30,12 +30,12 @@ class HarlowEpisodic_1D:
         self.n_objects  = config["num-objects"]
         self.n_episodes = config["num-episodes"]
         self.state_len  = config["state-len"] # size of state
-        self.obs_length = config["obj-len"]  # size of receptive field
+        self.obs_length = config["obs-len"]  # size of receptive field
         self.obj_offset = config["obj-offset"]
         self.fix_reward = config["fix-reward"]
         self.obj_reward = config["obj-reward"]
         self.map_action = config["map-action"]
-        
+
         self.time_step  = 0
         self.ctx_length = int(np.ceil(np.log2(self.n_objects)))
         self._generate_contexts()

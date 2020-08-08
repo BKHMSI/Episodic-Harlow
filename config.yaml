@@ -1,9 +1,9 @@
 run-title: HE_1
 seed: 1234
 device: cuda
-save-path: ckpt
+save-path: ckpts
 log-path: logs
-load-path: ckpt
+load-path: ckpts
 save-interval: 500
 resume: false
 dnd: true
@@ -17,6 +17,7 @@ task:
   num-objects: 500
   num-episodes: 3000
   
+  input-dim: 13
   state-len: 17
   obs-len: 8
   obj-offset: 3
