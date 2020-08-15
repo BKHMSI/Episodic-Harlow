@@ -1,23 +1,24 @@
-run-title: HE_1
-seed: 1234
+run-title: HE_GRU_1
+seed: 1111
 device: cuda
 save-path: ckpts
-log-path: logs
-load-path: ckpts
-save-interval: 500
+log-path: logs/HE_GRU
+save-interval: 1000
 resume: false
+load-title: HS_4
 dnd: true
-start-episode: 0 
+start-episode: 0
 optimizer: rmsprop # {rmsprop, adam}
+mode: vanilla # for a3c
 
 task:
   max-length: 250
   num-trials: 6
   num-actions: 2
-  num-objects: 500
+  num-objects: 1000
   num-episodes: 3000
   
-  input-dim: 13
+  input-dim: 12
   state-len: 17
   obs-len: 8
   obj-offset: 3
@@ -30,13 +31,14 @@ task:
     - -1
 
 agent:
+  rnn-type: gru
   mem-units: 256
 
   dict-len: 10_000
-  dict-key-dim: 9
+  dict-key-dim: 10
   dict-kernel: cosine
 
-  n-workers: 4
+  n-workers: 8
   share-optim: true
   
   value-loss-weight: 0.4

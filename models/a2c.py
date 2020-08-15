@@ -6,30 +6,31 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 from models.dnd import DND
+from models.ep_gru import EpGRU
 from models.ep_lstm import EpLSTM
 
-class A3C_DND_LSTM(nn.Module):
+class A2C_DND(nn.Module):
 
-    def __init__(self, 
+    def __init__(self,
+            rnn_type, 
             input_dim, 
             hidden_dim, 
             num_actions,
             dict_key_dim,
             dict_len,
             kernel='l2', 
-            bias=True,
             device="cpu",
     ):
-        super(A3C_DND_LSTM, self).__init__()
+        super(A2C_DND, self).__init__()
+        self.rnn_type = rnn_type
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
-        self.bias = bias
         self.device = device 
 
         self.encoder = nn.Sequential(
-            nn.Linear(9, 32),
+            nn.Linear(9, 64),
             nn.ReLU(),
-            nn.Linear(32, 64),
+            nn.Linear(64, 128),
             nn.ReLU(),
         )
 
@@ -37,8 +38,9 @@ class A3C_DND_LSTM(nn.Module):
         self.dnd = DND(dict_len, dict_key_dim, hidden_dim, kernel)
 
         # short-term memory
-        self.ep_lstm = EpLSTM(
-            input_size=64+4,
+        rnn = EpLSTM if self.rnn_type == "lstm" else EpGRU
+        self.ep_rnn = rnn(
+            input_size=128+num_actions+1,
             hidden_size=hidden_dim,
             num_layers=1,
             batch_first=False
@@ -51,7 +53,7 @@ class A3C_DND_LSTM(nn.Module):
 
     def reset_parameters(self):
         # reset lstm parameters
-        self.ep_lstm.reset_parameters()
+        self.ep_rnn.reset_parameters()
         # reset dnd 
         self.reset_memory()
         # intialize actor and critic weights
@@ -60,27 +62,26 @@ class A3C_DND_LSTM(nn.Module):
         T.nn.init.orthogonal_(self.critic.weight, gain=1.0)
         self.critic.bias.data.fill_(0)
 
-    def forward(self, obs, p_input, mem_state, cue=None):
+    def forward(self, obs, p_input, state, cue):
 
         feats = self.encoder(obs)
         x_t = T.cat((feats, *p_input), dim=-1)
 
-        if cue is None:
-            m_t = self.dnd.get_memory(feats).to(self.device)
-        else:
-            m_t = self.dnd.get_memory(cue).to(self.device)
+        m_t = self.dnd.get_memory(cue).to(self.device)
     
-        _, (h_t, c_t) = self.ep_lstm((x_t.unsqueeze(1), m_t.unsqueeze(1)), mem_state)
+        _, rnn_state = self.ep_rnn((x_t.unsqueeze(1), m_t.unsqueeze(1)), state)
+
+        h_t = rnn_state[0] if self.rnn_type == "lstm" else rnn_state
 
         action_logits = self.actor(h_t)
         value_estimate = self.critic(h_t)
 
-        return action_logits, value_estimate, (h_t, c_t), feats
+        return action_logits, value_estimate, rnn_state, feats
 
     def get_init_states(self):
-        h0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(self.device)
-        c0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(self.device)
-        return (h0, c0)
+        h0 = T.zeros(1, 1, self.ep_rnn.hidden_size).float().to(self.device)
+        c0 = T.zeros(1, 1, self.ep_rnn.hidden_size).float().to(self.device)
+        return (h0, c0) if self.rnn_type == "lstm" else h0
 
     def turn_off_encoding(self):
         self.dnd.encoding_off = True
@@ -98,7 +99,7 @@ class A3C_DND_LSTM(nn.Module):
         self.dnd.reset_memory()
 
     def save_memory(self, mem_key, mem_val):
-        self.dnd.save_memory(mem_key, mem_val, replace_similar=True, threshold=0.9)
+        self.dnd.save_memory(mem_key, mem_val, replace_similar=True, threshold=0.99)
 
     def retrieve_memory(self, query_key):
         return self.dnd.get_memory(query_key)

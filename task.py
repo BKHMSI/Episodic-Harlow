@@ -17,7 +17,9 @@ class HarlowEpisodic_1D:
     """  
     def __init__(self, 
         config,
+        episodic = True,
         verbose = False, 
+        start_episode = 0,
         visualize = False,
         save_path = None,
         save_interval = None 
@@ -41,7 +43,9 @@ class HarlowEpisodic_1D:
         self._generate_contexts()
 
         self.memory = []
-        self.episode_num = 0
+        self.episode_num = start_episode
+        self.episode_counter = 0
+        self.episodic = episodic
         self.verbose = verbose 
         self.visualize = visualize
         self.center = self.state_len // 2
@@ -59,7 +63,7 @@ class HarlowEpisodic_1D:
 
     @property
     def stage(self):
-        return int(self.episode_num >= self.n_episodes // 2)
+        return int(self.episode_counter >= self.n_episodes // 2)
 
     def _generate_contexts(self):
         self.context_pool = np.arange(self.n_objects)
@@ -111,13 +115,13 @@ class HarlowEpisodic_1D:
         elif self.current == self.obj_1:
             reward = self.obj_reward if self.reward_obj else -self.obj_reward
             if self.reward_obj:
-                self.reward_counter[self.episode_num-1][self.trial_num] = 1
+                self.reward_counter[self.episode_counter-1][self.trial_num] = 1
             self.trial_num += 1
             self._place_fixation()
         elif self.current == self.obj_2:
             reward = self.obj_reward if not self.reward_obj else -self.obj_reward
             if not self.reward_obj:
-                self.reward_counter[self.episode_num-1][self.trial_num] = 1
+                self.reward_counter[self.episode_counter-1][self.trial_num] = 1
             self.trial_num += 1
             self._place_fixation()
 
@@ -136,9 +140,10 @@ class HarlowEpisodic_1D:
         self.trial_num = 0
         self.time_step = 0
         self.episode_num += 1
+        self.episode_counter += 1
         self.pointer = self.center
 
-        if self.visualize and len(self.frames) > 0 and self.episode_num % self.save_interval == 0:
+        if self.visualize and len(self.frames) > 0 and self.episode_counter % self.save_interval == 0:
             self._save_frames()
         self.frames = []
 
@@ -162,7 +167,7 @@ class HarlowEpisodic_1D:
             print(f"Pointer: {self.pointer}")
 
         # episode objects
-        if self.stage == 0:
+        if self.stage == 0 or not self.episodic:
             self.obj_1, self.obj_2 = np.random.randint(
                 low=2, 
                 high=self.n_objects+2, 
