@@ -72,6 +72,7 @@ class EpLSTMCell(nn.Module):
             self.fun_rec = args.recurrent_activation
 
         self.reset_parameters_()
+        self.rs_gate = []
 
     # @T.jit.ignore
     def get_recurrent_weights(self):
@@ -159,12 +160,19 @@ class EpLSTMCell(nn.Module):
             gt = self.recurrent_dropout(gt)
 
         rt = self.fun_rec(Xr + Hr)
+    
+        # self.rs_gate += [rt.view(-1).mean().item()]
+        rt = (rt > 0.20) * rt 
+        self.rs_gate += [rt.view(-1).detach().cpu().numpy()]
 
         ct = (ft * c_tm1) + (it * gt) + (rt * T.tanh(mt))
 
         ht = ot * T.tanh(ct)
 
         return ht, (ht, ct)
+
+    def return_last_r_gate(self):
+        return self.rs_gate[-1]
 
     # @T.jit.export
     @T.jit.ignore

@@ -50,6 +50,7 @@ class A2C_DND(nn.Module):
         self.critic = nn.Linear(hidden_dim, 1)
 
         self.reset_parameters()
+        self.r_gates_closed = set(np.arange(hidden_dim))
 
     def reset_parameters(self):
         # reset lstm parameters
@@ -109,3 +110,19 @@ class A2C_DND(nn.Module):
         K = [self.dnd.keys[i] for i in range(n_mems)]
         V = [self.dnd.vals[i] for i in range(n_mems)]
         return K, V
+
+    def get_r_mean(self):
+        return np.array(self.ep_rnn.rnn[0].cell_.rs_gate).mean(axis=0)
+
+    def count_r_gate_closed(self):
+        r_gate = self.ep_rnn.rnn[0].cell_.return_last_r_gate()
+        return (np.array(r_gate)==0).sum() / len(r_gate)
+
+    def update_r_gates_closed_at_all_time(self):
+        r_gate = self.ep_rnn.rnn[0].cell_.return_last_r_gate()
+        indecies = np.arange(self.hidden_dim)[np.array(r_gate!=0)]
+        self.r_gates_closed = self.r_gates_closed - set(indecies)
+
+
+    def reset_r_mean(self):
+        self.ep_rnn.rnn[0].cell_.rs_gate = []

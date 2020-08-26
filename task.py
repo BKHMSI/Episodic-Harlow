@@ -31,6 +31,7 @@ class HarlowEpisodic_1D:
         self.n_actions  = config["num-actions"]
         self.n_objects  = config["num-objects"]
         self.n_episodes = config["num-episodes"]
+        self.n_stages   = config["num-stages"]
         self.state_len  = config["state-len"] # size of state
         self.obs_length = config["obs-len"]  # size of receptive field
         self.obj_offset = config["obj-offset"]
@@ -38,8 +39,14 @@ class HarlowEpisodic_1D:
         self.obj_reward = config["obj-reward"]
         self.map_action = config["map-action"]
 
+        self.mode = config["mode"]
+        if self.mode not in ["easy", "hard"]:
+            raise NotImplementedError(f"Mode: {self.mode}")
+
         self.time_step  = 0
         self.ctx_length = int(np.ceil(np.log2(self.n_objects)))
+        self.max_reward = self.n_trials * (self.fix_reward+self.obj_reward)
+
         self._generate_contexts()
 
         self.memory = []
@@ -49,7 +56,7 @@ class HarlowEpisodic_1D:
         self.verbose = verbose 
         self.visualize = visualize
         self.center = self.state_len // 2
-        self.reward_counter = np.zeros((self.n_episodes,self.n_trials))
+        self.reward_counter = np.zeros((self.n_episodes, self.n_trials))
 
         if self.visualize:
             self.frames = []
@@ -63,7 +70,8 @@ class HarlowEpisodic_1D:
 
     @property
     def stage(self):
-        return int(self.episode_counter >= self.n_episodes // 2)
+        return 1
+        # return (self.n_stages*self.episode_counter) // self.n_episodes
 
     def _generate_contexts(self):
         self.context_pool = np.arange(self.n_objects)
@@ -168,19 +176,15 @@ class HarlowEpisodic_1D:
 
         # episode objects
         if self.stage == 0 or not self.episodic:
-            self.obj_1, self.obj_2 = np.random.randint(
-                low=2, 
-                high=self.n_objects+2, 
-                size=2
-            )
+            self.obj_1, self.obj_2 = np.random.randint(low=2, high=self.n_objects+2, size=2)
             self.reward_obj  = np.random.rand() < 0.5
-            self.memory += [self.obj_1 if self.reward_obj else self.obj_2]
-        else:
-            self.obj_1 = np.random.choice(self.memory)
-            self.obj_2 = np.random.choice(list(np.arange(2, self.obj_1)) 
-                                        + list(np.arange(self.obj_1+1,self.n_objects+2)))
+        elif self.mode == "easy":
+            self.obj_1, self.obj_2, self.reward_obj = self.memory[np.random.randint(len(self.memory))]
+        elif self.mode == "hard":
+            self.obj_1 = self.memory[np.random.randint(len(self.memory))]
             self.reward_obj = True 
-
+            self.obj_2 = np.random.choice(list(np.arange(2, self.obj_1)) 
+                                    + list(np.arange(self.obj_1+1,self.n_objects+2)))
         
         ctx_idx = self.context_pool[self.obj_1-2] if self.reward_obj else self.context_pool[self.obj_2-2]
         self.context = _int2binary(ctx_idx, self.ctx_length)  
@@ -223,6 +227,20 @@ class HarlowEpisodic_1D:
     def _save_frames(self):
         filepath = self.save_path.format(epi=self.episode_num)
         imageio.mimsave(filepath, self.frames)
+
+    def save_memory(self):
+        if self.mode == "easy":
+            self.memory += [(int(self.obj_1*self.n_objects), int(self.obj_2*self.n_objects), self.reward_obj)]
+        elif self.mode == "hard":
+            self.memory += [int(self.obj_1*self.n_objects) if self.reward_obj else int(self.obj_2*self.n_objects)]
+    
+    def export_memories(self, path):
+        np.save(os.path.join(path, "memories.npy"), np.array(self.memory))
+        np.save(os.path.join(path, "context_pool.npy"), np.array(self.context_pool))
+
+    def load_memories(self, path):
+        self.memory = np.load(os.path.join(path, "memories.npy"))
+        self.context_pool = np.load(os.path.join(path, "context_pool.npy"))
 
 
 if __name__ == "__main__":

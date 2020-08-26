@@ -29,75 +29,84 @@ if __name__ == "__main__":
     with open(args.config, 'r', encoding="utf-8") as fin:
         config = yaml.load(fin, Loader=yaml.FullLoader)
 
-    T.manual_seed(config["seed"])
-    np.random.seed(config["seed"])
-    T.random.manual_seed(config["seed"])
+    n_seeds = 8
+    base_seed = config["seed"]
+    base_run_title = config["run-title"]
+    for seed_idx in range(1, n_seeds+1):
 
-    exp_path = os.path.join(config["save-path"], config["run-title"])
-    if not os.path.isdir(exp_path): 
-        os.mkdir(exp_path)
-    
-    out_path = os.path.join(exp_path, os.path.basename(args.config))
-    with open(out_path, 'w') as fout:
-        yaml.dump(config, fout)
+        config["seed"] = base_seed * seed_idx
+        config["run-title"] = base_run_title + f"_{seed_idx}"
 
-    ############## Start Here ##############
-    print(f"> Running {config['run-title']} | Optim: {config['optimizer']} | Model: {config['mode']}")
+        T.manual_seed(config["seed"])
+        np.random.seed(config["seed"])
+        T.random.manual_seed(config["seed"])
+        
 
-    if config['mode'] == "stacked":
-        shared_model = A3C_DND_StackedLSTM(
-            config["task"]["input-dim"],
-            config["agent"]["mem-units"], 
-            config["task"]["num-actions"],
-            config["agent"]["dict-key-dim"],
-            config["agent"]["dict-len"],
-            config["agent"]["dict-kernel"],
-            device=config["device"]
-        )
-    elif config['mode'] == "vanilla":
-        shared_model = A2C_DND(
-            config["agent"]["rnn-type"],
-            config["task"]["input-dim"],
-            config["agent"]["mem-units"], 
-            config["task"]["num-actions"],
-            config["agent"]["dict-key-dim"],
-            config["agent"]["dict-len"],
-            config["agent"]["dict-kernel"],
-            device=config["device"]
-        )
+        exp_path = os.path.join(config["save-path"], config["run-title"])
+        if not os.path.isdir(exp_path): 
+            os.mkdir(exp_path)
+        
+        out_path = os.path.join(exp_path, os.path.basename(args.config))
+        with open(out_path, 'w') as fout:
+            yaml.dump(config, fout)
 
-    shared_model.share_memory()
-    shared_model.to(config['device'])
+        ############## Start Here ##############
+        print(f"> Running {config['run-title']} | Optim: {config['optimizer']} | Model: {config['mode']}")
 
-    optim_class = SharedAdam if config["optimizer"] == "adam" else SharedRMSprop
-    optimizer = optim_class(shared_model.parameters(), lr=config["agent"]["lr"])
-    optimizer.share_memory()
+        if config['mode'] == "stacked":
+            shared_model = A3C_DND_StackedLSTM(
+                config["task"]["input-dim"],
+                config["agent"]["mem-units"], 
+                config["task"]["num-actions"],
+                config["agent"]["dict-key-dim"],
+                config["agent"]["dict-len"],
+                config["agent"]["dict-kernel"],
+                device=config["device"]
+            )
+        elif config['mode'] == "vanilla":
+            shared_model = A2C_DND(
+                config["agent"]["rnn-type"],
+                config["task"]["input-dim"],
+                config["agent"]["mem-units"], 
+                config["task"]["num-actions"],
+                config["agent"]["dict-key-dim"],
+                config["agent"]["dict-len"],
+                config["agent"]["dict-kernel"],
+                device=config["device"]
+            )
 
-    processes = []
-    
-    if config["resume"]:
-        filepath = os.path.join(
-            config["save-path"], 
-            config["load-title"], 
-            f"{config['load-title']}_{config['start-episode']}.pt"
-        )
-        print(f"> Loading Checkpoint {filepath}")
-        shared_model.load_state_dict(T.load(filepath)["state_dict"])
+        shared_model.share_memory()
+        shared_model.to(config['device'])
 
-    train_target = train_stacked if config['mode'] == "stacked" else train_episodic
-    for rank in range(config["agent"]["n-workers"]):
-        p = mp.Process(target=train_target, args=(
-            config,
-            shared_model,
-            optimizer,
-            rank,
-        ))
-        p.start()
-        processes += [p]
+        optim_class = SharedAdam if config["optimizer"] == "adam" else SharedRMSprop
+        optimizer = optim_class(shared_model.parameters(), lr=config["agent"]["lr"])
+        optimizer.share_memory()
 
-    for p in processes:
-        p.join()
+        processes = []
+        
+        if config["resume"]:
+            filepath = os.path.join(
+                config["save-path"], 
+                config["load-title"], 
+                f"{config['load-title']}_{config['start-episode']}.pt"
+            )
+            print(f"> Loading Checkpoint {filepath}")
+            shared_model.load_state_dict(T.load(filepath)["state_dict"])
+
+        train_target = train_stacked if config['mode'] == "stacked" else train_episodic
+        for rank in range(config["agent"]["n-workers"]):
+            p = mp.Process(target=train_target, args=(
+                config,
+                shared_model,
+                optimizer,
+                rank,
+            ))
+            p.start()
+            processes += [p]
+
+        for p in processes:
+            p.join()
 
 
 
-    
+        

@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch as T
 import torch.nn.functional as F
 
@@ -57,6 +59,16 @@ class DND:
     def check_config(self):
         assert self.dict_len > 0
         assert self.kernel in ALL_KERNELS
+
+    def export_memories(self, path):
+        limit = self.dict_len if self.overflow else self.pointer
+        np.save(path+"_keys.npy", self.keys[:limit].numpy())
+        np.save(path+"_vals.npy", self.vals[:limit].numpy())
+
+    def load_memories(self, path):
+        self.keys = T.from_numpy(np.load(path+"_keys.npy"))
+        self.vals = T.from_numpy(np.load(path+"_vals.npy"))
+        self.pointer = len(self.keys)
 
     def inject_memories(self, input_keys, input_vals):
         """Inject pre-defined keys and values

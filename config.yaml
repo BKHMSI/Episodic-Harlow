@@ -1,13 +1,13 @@
-run-title: HE_GRU_1
-seed: 1111
+run-title: H_LSTM_FINAL_EP8
+seed: 42
 device: cuda
 save-path: ckpts
-log-path: logs/HE_GRU
+log-path: logs_final/H_LSTM_FINAL_EP8
 save-interval: 1000
-resume: false
-load-title: HS_4
+resume: true
+load-title: H_LSTM_FINAL_EP8
 dnd: true
-start-episode: 0
+start-episode: 5000
 optimizer: rmsprop # {rmsprop, adam}
 mode: vanilla # for a3c
 
@@ -16,7 +16,10 @@ task:
   num-trials: 6
   num-actions: 2
   num-objects: 1000
-  num-episodes: 3000
+  num-episodes: 500
+  num-stages: 10
+
+  mode: easy # {easy, hard}
   
   input-dim: 12
   state-len: 17
@@ -25,13 +28,14 @@ task:
   
   fix-reward: 0.2
   obj-reward: 1.0
+  min-reward: 0
 
   map-action:
     -  1
     - -1
 
 agent:
-  rnn-type: gru
+  rnn-type: lstm
   mem-units: 256
 
   dict-len: 10_000
@@ -42,7 +46,7 @@ agent:
   share-optim: true
   
   value-loss-weight: 0.4
-  entropy-weight: 0.001
+  entropy-weight: 0.01
   max-grad-norm: 0.
   
   gae-lambda: 1.
@@ -51,4 +55,3 @@ agent:
   weight-decay: 0
 
   n-step-update: 20 
-

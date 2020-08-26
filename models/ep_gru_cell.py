@@ -47,7 +47,7 @@ class EpGRUCell(nn.Module):
             self,
             input_size: int,
             args,
-    ):
+        ):
         super().__init__()
         self._args = args
         self.Dx = input_size
@@ -73,6 +73,7 @@ class EpGRUCell(nn.Module):
             self.fun_rec = args.recurrent_activation
 
         self.reset_parameters_()
+        self.rs_gate = []
 
     # @T.jit.ignore
     def get_recurrent_weights(self):
@@ -145,6 +146,8 @@ class EpGRUCell(nn.Module):
         rt = self.fun_rec(Xr + Hr)
         zt = self.fun_rec(Xz + Hz)
         et = self.fun_rec(Xe + He)
+
+        self.rs_gate += [et.view(-1).mean().item()]
 
         ht_hat = T.tanh(self.xh_kernel(xt) + self.hh_kernel(rt * h_tm1)) 
  
